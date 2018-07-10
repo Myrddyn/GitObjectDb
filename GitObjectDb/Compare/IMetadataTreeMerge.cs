@@ -1,4 +1,7 @@
+using GitObjectDb.Models;
+using GitObjectDb.Reflection;
 using LibGit2Sharp;
+using System.Collections.Generic;
 
 namespace GitObjectDb.Compare
 {
@@ -16,6 +19,11 @@ namespace GitObjectDb.Compare
         /// Gets the name of the merge source branch.
         /// </summary>
         string BranchName { get; }
+
+        /// <summary>
+        /// Gets the modified chunks.
+        /// </summary>
+        IList<MetadataTreeMergeChunkChange> ModifiedChunks { get; }
 
         /// <summary>
         /// Applies the changes in the repository.

@@ -64,16 +64,16 @@ namespace GitObjectDb.Models
 
         /// <inheritdoc />
         [DataMember]
-        public Guid Id { get; }
+        public Guid Id { get; private set; }
 
         /// <inheritdoc />
         [DataMember]
         [Modifiable]
-        public string Name { get; }
+        public string Name { get; private set; }
 
         /// <inheritdoc />
         [DebuggerBrowsable(DebuggerBrowsableState.Never)]
-        public IEnumerable<IMetadataObject> Children => _dataAccessor.ChildProperties.SelectMany(p => p.Accessor(this));
+        public IEnumerable<IMetadataObject> Children => _dataAccessor.ChildProperties.SelectMany(p => p.Value.Accessor(this));
 
         /// <inheritdoc />
         public IMetadataObject Parent { get; private set; }

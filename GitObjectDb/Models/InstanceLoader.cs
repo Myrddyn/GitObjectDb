@@ -77,8 +77,10 @@ namespace GitObjectDb.Models
             ILazyChildren ResolveChildren(Type type, string propertyName)
             {
                 var dataAccessor = _dataAccessorProvider.Get(type);
-                var childProperty = dataAccessor.ChildProperties.FirstOrDefault(p => p.Matches(propertyName)) ??
+                if (!dataAccessor.ChildProperties.TryGetValue(propertyName, out var childProperty))
+                {
                     throw new NotSupportedException($"Unable to find property details for '{propertyName}'.");
+                }
                 return LoadEntryChildren(commitId, path, childProperty);
             }
             var serializer = GetJsonSerializer(ResolveChildren);
@@ -87,9 +89,14 @@ namespace GitObjectDb.Models
             return (IMetadataObject)jobject.ToObject(objectType, serializer);
         }
 
-        JsonSerializer GetJsonSerializer(MetadataObjectJsonConverter.ChildrenResolver childrenResolver)
+        /// <inheritdoc />
+        public JsonSerializer GetJsonSerializer(ChildrenResolver childrenResolver)
         {
-            var serializer = new JsonSerializer { TypeNameHandling = TypeNameHandling.Objects };
+            var serializer = new JsonSerializer
+            {
+                TypeNameHandling = TypeNameHandling.Objects,
+                Formatting = Formatting.Indented
+            };
             serializer.Converters.Add(new MetadataObjectJsonConverter(_serviceProvider, childrenResolver));
 
             // Optimization: prevent reflection for each new object!

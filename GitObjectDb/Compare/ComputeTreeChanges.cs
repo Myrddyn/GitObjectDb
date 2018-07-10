@@ -46,7 +46,7 @@ namespace GitObjectDb.Compare
             var path = stack.ToDataPath();
             definition.Remove(path);
             var dataAccessor = _modelDataProvider.Get(left.GetType());
-            foreach (var childProperty in dataAccessor.ChildProperties)
+            foreach (var childProperty in dataAccessor.ChildProperties.Values)
             {
                 stack.Push(childProperty.Name);
                 foreach (var child in left.Children)
@@ -85,7 +85,7 @@ namespace GitObjectDb.Compare
                 var modified = CollectModifiedNodes(oldInstance, newInstance, changes, oldCommit);
                 var added = CollectAddedNodes(newInstance, changes, newCommit);
                 var deleted = CollectDeletedNodes(oldInstance, changes, oldCommit);
-                return new MetadataTreeChanges(added, modified, deleted);
+                return new MetadataTreeChanges(oldInstance, newInstance, added, modified, deleted);
             });
         }
 
@@ -164,7 +164,7 @@ namespace GitObjectDb.Compare
             var anyChange = false;
             var accessor = _modelDataProvider.Get(original.GetType());
             UpdateNodeIfNeeded(repository, original, @new, definition, stack, accessor, ref anyChange);
-            foreach (var childProperty in accessor.ChildProperties)
+            foreach (var childProperty in accessor.ChildProperties.Values)
             {
                 if (!childProperty.ShouldVisitChildren(original) && !childProperty.ShouldVisitChildren(@new))
                 {
@@ -228,7 +228,7 @@ namespace GitObjectDb.Compare
 
         void UpdateNodeIfNeeded(IRepository repository, IMetadataObject original, IMetadataObject @new, TreeDefinition definition, Stack<string> stack, IModelDataAccessor accessor, ref bool anyChange)
         {
-            if (accessor.ModifiableProperties.Any(p => !p.AreSame(original, @new)))
+            if (accessor.ModifiableProperties.Values.Any(p => !p.AreSame(original, @new)))
             {
                 AddOrUpdateNode(repository, @new, definition, stack);
                 anyChange = true;

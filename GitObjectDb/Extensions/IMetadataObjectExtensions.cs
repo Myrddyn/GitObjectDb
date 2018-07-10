@@ -120,7 +120,7 @@ namespace GitObjectDb.Models
             {
                 ToDataPath(node.Parent, dataAccessorProvider, builder);
                 var dataAccessor = dataAccessorProvider.Get(node.Parent.GetType());
-                var childProperty = dataAccessor.ChildProperties.Single(p => p.ItemType.IsInstanceOfType(node));
+                var childProperty = dataAccessor.ChildProperties.Values.Single(p => p.ItemType.IsInstanceOfType(node));
                 builder.Append('/');
                 builder.Append(childProperty.Name);
                 builder.Append('/');

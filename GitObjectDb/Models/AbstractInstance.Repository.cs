@@ -1,4 +1,5 @@
 using GitObjectDb.Git;
+using GitObjectDb.Reflection;
 using LibGit2Sharp;
 using System;
 using System.Collections.Generic;
@@ -77,7 +78,7 @@ namespace GitObjectDb.Models
         void AddNodeChildrenToCommit(IRepository repository, TreeDefinition tree, Stack<string> stack, IMetadataObject node)
         {
             var dataAccessor = DataAccessorProvider.Get(node.GetType());
-            foreach (var childProperty in dataAccessor.ChildProperties)
+            foreach (var childProperty in dataAccessor.ChildProperties.Values)
             {
                 var children = childProperty.Accessor(node);
                 stack.Push(childProperty.Name);
@@ -102,11 +103,15 @@ namespace GitObjectDb.Models
             var chunks = path.Split(new[] { '/' }, StringSplitOptions.RemoveEmptyEntries);
 
             IMetadataObject result = this;
-            for (int i = 0; i < chunks.Length && result != null; i++)
+            for (int i = 0; i < chunks.Length - 1 && result != null; i++)
             {
-                var propertyInfo = DataAccessorProvider.Get(result.GetType()).ChildProperties.FirstOrDefault(p =>
-                    p.Name.Equals(chunks[i], StringComparison.OrdinalIgnoreCase));
-                if (propertyInfo == null || ++i >= chunks.Length)
+                if (!DataAccessorProvider.Get(result.GetType()).ChildProperties.TryGetValue(chunks[i], out var propertyInfo))
+                {
+                    return null;
+                }
+
+                i++;
+                if (i >= chunks.Length)
                 {
                     return null;
                 }

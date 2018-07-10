@@ -11,7 +11,7 @@ namespace GitObjectDb.Compare
     [DebuggerDisplay("Status = {Status}, Old = {Old?.Id}, New = {New?.Id}")]
     public class MetadataTreeEntryChanges
     {
-        private readonly PatchEntryChanges _entryChanges;
+        readonly PatchEntryChanges _entryChanges;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="MetadataTreeEntryChanges"/> class.
