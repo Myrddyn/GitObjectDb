@@ -68,6 +68,15 @@ namespace GitObjectDb.Git
         /// <inheritdoc/>
         public void Execute(RepositoryDescription description, Action<IRepository> processor)
         {
+            if (description == null)
+            {
+                throw new ArgumentNullException(nameof(description));
+            }
+            if (processor == null)
+            {
+                throw new ArgumentNullException(nameof(processor));
+            }
+
             Execute(description, repository =>
             {
                 processor(repository);

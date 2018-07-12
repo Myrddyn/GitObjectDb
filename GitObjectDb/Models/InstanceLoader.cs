@@ -92,6 +92,11 @@ namespace GitObjectDb.Models
         /// <inheritdoc />
         public JsonSerializer GetJsonSerializer(ChildrenResolver childrenResolver)
         {
+            if (childrenResolver == null)
+            {
+                throw new ArgumentNullException(nameof(childrenResolver));
+            }
+
             var serializer = new JsonSerializer
             {
                 TypeNameHandling = TypeNameHandling.Objects,

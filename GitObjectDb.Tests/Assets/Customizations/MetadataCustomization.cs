@@ -10,9 +10,9 @@ namespace GitObjectDb.Tests.Assets.Customizations
 {
     public class MetadataCustomization : ICustomization
     {
-        internal const int ApplicationCount = 10;
-        internal const int PagePerApplicationCount = 5;
-        internal const int FieldPerPageCount = 20;
+        internal const int ApplicationCount = 2;
+        internal const int PagePerApplicationCount = 3;
+        internal const int FieldPerPageCount = 10;
 
         public void Customize(IFixture fixture)
         {

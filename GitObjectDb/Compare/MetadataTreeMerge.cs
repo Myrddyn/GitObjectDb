@@ -74,7 +74,7 @@ namespace GitObjectDb.Compare
 
         static JObject GetContent(Commit mergeBase, string path, string branchInfo)
         {
-            string content = mergeBase[path].Target.Peel<Blob>().GetContentText() ??
+            var content = mergeBase[path]?.Target?.Peel<Blob>()?.GetContentText() ??
                 throw new NotImplementedException($"Could not find node {path} in {branchInfo} tree.");
             return JsonConvert.DeserializeObject<JObject>(content);
         }
@@ -112,6 +112,7 @@ namespace GitObjectDb.Compare
         void ComputeMerge(IRepository repository, Commit mergeBase, Commit branchTip, Commit headTip)
         {
             var branchChanges = repository.Diff.Compare<Patch>(mergeBase.Tree, branchTip.Tree);
+            var headChanges = repository.Diff.Compare<Patch>(mergeBase.Tree, headTip.Tree);
             foreach (var change in branchChanges)
             {
                 switch (change.Status)
@@ -121,7 +122,7 @@ namespace GitObjectDb.Compare
                         var branchObject = GetContent(branchTip, change.Path, "branch tip");
                         var headObject = GetContent(headTip, change.Path, "head tip");
 
-                        AddModifiedChunks(change, mergeBaseObject, branchObject, headObject);
+                        AddModifiedChunks(change, mergeBaseObject, branchObject, headObject, headChanges);
                         break;
                     case ChangeKind.Added:
                     case ChangeKind.Deleted:
@@ -131,17 +132,24 @@ namespace GitObjectDb.Compare
             }
         }
 
-        void AddModifiedChunks(PatchEntryChanges change, JObject mergeBaseObject, JObject newObject, JObject headObject)
+        void AddModifiedChunks(PatchEntryChanges branchChange, JObject mergeBaseObject, JObject newObject, JObject headObject, Patch headChanges)
         {
+            var headChange = headChanges[branchChange.Path];
+            if (headChange?.Status == ChangeKind.Deleted)
+            {
+                throw new NotImplementedException($"Conflict as a modified node {branchChange.Path} in merge branch source has been deleted in head.");
+            }
             var type = Type.GetType(mergeBaseObject.Value<string>("$type"));
             var properties = _modelDataProvider.Get(type).ModifiableProperties;
 
+            JToken headValue = null;
             ModifiablePropertyInfo p = null;
             var changes = from kvp in (IEnumerable<KeyValuePair<string, JToken>>)newObject
                           where properties.TryGetValue(kvp.Key, out p)
                           let mergeBaseValue = mergeBaseObject[kvp.Key]
                           where mergeBaseValue == null || !JToken.DeepEquals(kvp.Value, mergeBaseValue)
-                          select new MetadataTreeMergeChunkChange(change.Path, mergeBaseObject, newObject, headObject, p, kvp.Value);
+                          where headObject.TryGetValue(kvp.Key, StringComparison.OrdinalIgnoreCase, out headValue) || ((headValue = null) == null)
+                          select new MetadataTreeMergeChunkChange(branchChange.Path, mergeBaseObject, newObject, headObject, p, mergeBaseValue, kvp.Value, headValue);
 
             foreach (var modifiedProperty in changes)
             {
@@ -155,6 +163,11 @@ namespace GitObjectDb.Compare
             if (merger == null)
             {
                 throw new ArgumentNullException(nameof(merger));
+            }
+            var remainingConflicts = ModifiedChunks.Where(c => c.IsInConflict).ToList();
+            if (remainingConflicts.Any())
+            {
+                throw new RemainingConflictsException(remainingConflicts);
             }
 
             return _repositoryProvider.Execute(_repositoryDescription, repository =>
@@ -178,10 +191,10 @@ namespace GitObjectDb.Compare
             var buffer = new StringBuilder();
             foreach (var change in ModifiedChunks.GroupBy(c => c.HeadNode))
             {
-                var modified = change.Key.DeepClone();
+                var modified = (JObject)change.Key.DeepClone();
                 foreach (var chunkChange in change)
                 {
-                    modified[chunkChange.Property.Name] = chunkChange.Value;
+                    chunkChange.ApplyTo(modified);
                 }
                 Serialize(modified, buffer);
                 definition.Add(change.First().Path, repository.CreateBlob(buffer), Mode.NonExecutableFile);
