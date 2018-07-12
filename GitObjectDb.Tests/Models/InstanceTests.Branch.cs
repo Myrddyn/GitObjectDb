@@ -68,7 +68,7 @@ namespace GitObjectDb.Tests.Models
             sut.Commit(updateName.Instance, signature, message); // B
             sut.Checkout("master");
             var updateNameOther = page.With(p => p.Name == "yet again modified name");
-            var commitC = sut.Commit(updateNameOther.Instance, signature, message); // C
+            sut.Commit(updateNameOther.Instance, signature, message); // C
             var loaded = loader.LoadFrom<Instance>(GetRepositoryDescription());
             Assert.Throws<RemainingConflictsException>(() => loaded.Merge("newBranch").Apply(signature));
         }
