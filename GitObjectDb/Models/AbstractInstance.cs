@@ -18,7 +18,7 @@ namespace GitObjectDb.Models
     /// </summary>
     /// <seealso cref="AbstractModel" />
     /// <seealso cref="IInstance" />
-    [DebuggerDisplay(DebuggerDisplay + ", IsRepositoryAttached = {_getRepository != null}")]
+    [DebuggerDisplay(DebuggerDisplay + ", IsRepositoryAttached = {_repositoryDescription != null}")]
     [DataContract]
     public abstract partial class AbstractInstance : AbstractModel, IInstance
     {
