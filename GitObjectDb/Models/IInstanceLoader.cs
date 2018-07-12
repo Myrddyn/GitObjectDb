@@ -15,7 +15,7 @@ namespace GitObjectDb.Models
         /// </summary>
         /// <param name="childrenResolver">The children resolver.</param>
         /// <returns>A new <see cref="JsonSerializer"/>.</returns>
-        JsonSerializer GetJsonSerializer(ChildrenResolver childrenResolver);
+        JsonSerializer GetJsonSerializer(ChildrenResolver childrenResolver = null);
 
         /// <summary>
         /// Loads the instance from a Git repository.

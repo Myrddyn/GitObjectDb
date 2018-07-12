@@ -16,8 +16,8 @@ namespace GitObjectDb.Reflection
     {
         readonly IServiceProvider _serviceProvider;
         readonly IModelDataAccessorProvider _dataAccessorProvider;
-        readonly Lazy<IImmutableDictionary<string, ChildPropertyInfo>> _childProperties;
-        readonly Lazy<IImmutableDictionary<string, ModifiablePropertyInfo>> _modifiableProperties;
+        readonly Lazy<IImmutableList<ChildPropertyInfo>> _childProperties;
+        readonly Lazy<IImmutableList<ModifiablePropertyInfo>> _modifiableProperties;
         readonly Lazy<ConstructorParameterBinding> _constructorBinding;
 
         /// <summary>
@@ -38,8 +38,8 @@ namespace GitObjectDb.Reflection
             Type = type ?? throw new ArgumentNullException(nameof(type));
 
             _dataAccessorProvider = _serviceProvider.GetRequiredService<IModelDataAccessorProvider>();
-            _childProperties = new Lazy<IImmutableDictionary<string, ChildPropertyInfo>>(GetChildProperties);
-            _modifiableProperties = new Lazy<IImmutableDictionary<string, ModifiablePropertyInfo>>(GetModifiableProperties);
+            _childProperties = new Lazy<IImmutableList<ChildPropertyInfo>>(GetChildProperties);
+            _modifiableProperties = new Lazy<IImmutableList<ModifiablePropertyInfo>>(GetModifiableProperties);
             _constructorBinding = new Lazy<ConstructorParameterBinding>(() =>
             {
                 var constructors = from c in Type.GetConstructors()
@@ -52,26 +52,26 @@ namespace GitObjectDb.Reflection
         public Type Type { get; }
 
         /// <inheritdoc />
-        public IImmutableDictionary<string, ChildPropertyInfo> ChildProperties => _childProperties.Value;
+        public IImmutableList<ChildPropertyInfo> ChildProperties => _childProperties.Value;
 
         /// <inheritdoc />
-        public IImmutableDictionary<string, ModifiablePropertyInfo> ModifiableProperties => _modifiableProperties.Value;
+        public IImmutableList<ModifiablePropertyInfo> ModifiableProperties => _modifiableProperties.Value;
 
         /// <inheritdoc />
         public ConstructorParameterBinding ConstructorParameterBinding => _constructorBinding.Value;
 
-        IImmutableDictionary<string, ChildPropertyInfo> GetChildProperties() =>
+        IImmutableList<ChildPropertyInfo> GetChildProperties() =>
             (from p in Type.GetProperties()
              let lazyChildrenType = LazyChildrenHelper.TryGetLazyChildrenInterface(p.PropertyType)
              where lazyChildrenType != null
              select new ChildPropertyInfo(p, lazyChildrenType.GetGenericArguments()[0]))
-            .ToImmutableSortedDictionary(p => p.Name, p => p, StringComparer.OrdinalIgnoreCase);
+            .ToImmutableList();
 
-        IImmutableDictionary<string, ModifiablePropertyInfo> GetModifiableProperties() =>
+        IImmutableList<ModifiablePropertyInfo> GetModifiableProperties() =>
             (from p in Type.GetProperties()
              where Attribute.IsDefined(p, typeof(ModifiableAttribute))
              select new ModifiablePropertyInfo(p))
-            .ToImmutableSortedDictionary(p => p.Name, p => p, StringComparer.OrdinalIgnoreCase);
+            .ToImmutableList();
 
         IMetadataObject CloneSubTree(IMetadataObject @object, PredicateReflector reflector)
         {

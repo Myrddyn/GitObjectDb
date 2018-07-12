@@ -46,7 +46,7 @@ namespace GitObjectDb.Compare
             var path = stack.ToDataPath();
             definition.Remove(path);
             var dataAccessor = _modelDataProvider.Get(left.GetType());
-            foreach (var childProperty in dataAccessor.ChildProperties.Values)
+            foreach (var childProperty in dataAccessor.ChildProperties)
             {
                 stack.Push(childProperty.Name);
                 foreach (var child in left.Children)
@@ -165,7 +165,7 @@ namespace GitObjectDb.Compare
             var anyChange = false;
             var accessor = _modelDataProvider.Get(original.GetType());
             UpdateNodeIfNeeded(repository, original, @new, definition, stack, accessor, ref anyChange);
-            foreach (var childProperty in accessor.ChildProperties.Values)
+            foreach (var childProperty in accessor.ChildProperties)
             {
                 if (!childProperty.ShouldVisitChildren(original) && !childProperty.ShouldVisitChildren(@new))
                 {
@@ -229,7 +229,7 @@ namespace GitObjectDb.Compare
 
         void UpdateNodeIfNeeded(IRepository repository, IMetadataObject original, IMetadataObject @new, TreeDefinition definition, Stack<string> stack, IModelDataAccessor accessor, ref bool anyChange)
         {
-            if (accessor.ModifiableProperties.Values.Any(p => !p.AreSame(original, @new)))
+            if (accessor.ModifiableProperties.Any(p => !p.AreSame(original, @new)))
             {
                 AddOrUpdateNode(repository, @new, definition, stack);
                 anyChange = true;

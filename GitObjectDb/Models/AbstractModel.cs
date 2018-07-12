@@ -73,7 +73,7 @@ namespace GitObjectDb.Models
 
         /// <inheritdoc />
         [DebuggerBrowsable(DebuggerBrowsableState.Never)]
-        public IEnumerable<IMetadataObject> Children => _dataAccessor.ChildProperties.SelectMany(p => p.Value.Accessor(this));
+        public IEnumerable<IMetadataObject> Children => _dataAccessor.ChildProperties.SelectMany(p => p.Accessor(this));
 
         /// <inheritdoc />
         public IMetadataObject Parent { get; private set; }

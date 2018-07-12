@@ -18,12 +18,12 @@ namespace GitObjectDb.Reflection
         /// <summary>
         /// Gets the child properties.
         /// </summary>
-        IImmutableDictionary<string, ChildPropertyInfo> ChildProperties { get; }
+        IImmutableList<ChildPropertyInfo> ChildProperties { get; }
 
         /// <summary>
         /// Gets the modifiable properties.
         /// </summary>
-        IImmutableDictionary<string, ModifiablePropertyInfo> ModifiableProperties { get; }
+        IImmutableList<ModifiablePropertyInfo> ModifiableProperties { get; }
 
         /// <summary>
         /// Gets the constructor parameter binding.

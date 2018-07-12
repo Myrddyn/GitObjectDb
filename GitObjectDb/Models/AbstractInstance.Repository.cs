@@ -78,7 +78,7 @@ namespace GitObjectDb.Models
         void AddNodeChildrenToCommit(IRepository repository, TreeDefinition tree, Stack<string> stack, IMetadataObject node)
         {
             var dataAccessor = DataAccessorProvider.Get(node.GetType());
-            foreach (var childProperty in dataAccessor.ChildProperties.Values)
+            foreach (var childProperty in dataAccessor.ChildProperties)
             {
                 var children = childProperty.Accessor(node);
                 stack.Push(childProperty.Name);
@@ -105,7 +105,10 @@ namespace GitObjectDb.Models
             IMetadataObject result = this;
             for (int i = 0; i < chunks.Length - 1 && result != null; i++)
             {
-                if (!DataAccessorProvider.Get(result.GetType()).ChildProperties.TryGetValue(chunks[i], out var propertyInfo))
+                var dataAccessor = DataAccessorProvider.Get(result.GetType());
+                var propertyInfo = dataAccessor.ChildProperties.FirstOrDefault(
+                    p => p.FolderName.Equals(chunks[i], StringComparison.OrdinalIgnoreCase));
+                if (propertyInfo == null)
                 {
                     return null;
                 }

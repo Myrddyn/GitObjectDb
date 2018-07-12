@@ -73,28 +73,30 @@ namespace GitObjectDb.Models
 
         IMetadataObject LoadEntry(ObjectId commitId, TreeEntry entry, string path)
         {
-            var blob = entry.Target.Peel<Blob>();
             ILazyChildren ResolveChildren(Type type, string propertyName)
             {
                 var dataAccessor = _dataAccessorProvider.Get(type);
-                if (!dataAccessor.ChildProperties.TryGetValue(propertyName, out var childProperty))
+                var childProperty = dataAccessor.ChildProperties.FirstOrDefault(
+                    p => p.Name.Equals(propertyName, StringComparison.OrdinalIgnoreCase));
+                if (childProperty == null)
                 {
                     throw new NotSupportedException($"Unable to find property details for '{propertyName}'.");
                 }
                 return LoadEntryChildren(commitId, path, childProperty);
             }
             var serializer = GetJsonSerializer(ResolveChildren);
+            var blob = entry.Target.Peel<Blob>();
             var jobject = blob.GetContentStream().ToJson<JObject>(serializer);
             var objectType = Type.GetType(jobject.Value<string>("$type"));
             return (IMetadataObject)jobject.ToObject(objectType, serializer);
         }
 
         /// <inheritdoc />
-        public JsonSerializer GetJsonSerializer(ChildrenResolver childrenResolver)
+        public JsonSerializer GetJsonSerializer(ChildrenResolver childrenResolver = null)
         {
             if (childrenResolver == null)
             {
-                throw new ArgumentNullException(nameof(childrenResolver));
+                childrenResolver = ReturnEmptyChildren;
             }
 
             var serializer = new JsonSerializer
@@ -108,6 +110,14 @@ namespace GitObjectDb.Models
             serializer.ContractResolver = _contractResolver;
 
             return serializer;
+        }
+
+        ILazyChildren ReturnEmptyChildren(Type parentType, string propertyName)
+        {
+            var dataAccessor = _dataAccessorProvider.Get(parentType);
+            var childProperty = dataAccessor.ChildProperties.FirstOrDefault(
+                p => p.Name.Equals(propertyName, StringComparison.OrdinalIgnoreCase));
+            return LazyChildrenHelper.Create(childProperty, (o, r) => Enumerable.Empty<IMetadataObject>());
         }
 
         ILazyChildren LoadEntryChildren(ObjectId commitId, string path, ChildPropertyInfo childProperty) =>

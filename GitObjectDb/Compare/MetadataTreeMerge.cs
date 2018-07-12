@@ -58,7 +58,7 @@ namespace GitObjectDb.Compare
             _repositoryProvider = serviceProvider.GetRequiredService<IRepositoryProvider>();
             _modelDataProvider = serviceProvider.GetRequiredService<IModelDataAccessorProvider>();
             _instanceLoader = serviceProvider.GetRequiredService<IInstanceLoader>();
-            _serializer = new Lazy<JsonSerializer>(() => _instanceLoader.GetJsonSerializer(ReturnEmptyChildren));
+            _serializer = new Lazy<JsonSerializer>(() => _instanceLoader.GetJsonSerializer());
 
             Initialize();
         }
@@ -77,12 +77,6 @@ namespace GitObjectDb.Compare
             var content = mergeBase[path]?.Target?.Peel<Blob>()?.GetContentText() ??
                 throw new NotImplementedException($"Could not find node {path} in {branchInfo} tree.");
             return JsonConvert.DeserializeObject<JObject>(content);
-        }
-
-        ILazyChildren ReturnEmptyChildren(Type parentType, string propertyName)
-        {
-            var childProperty = _modelDataProvider.Get(parentType).ChildProperties[propertyName];
-            return LazyChildrenHelper.Create(childProperty, (o, r) => Enumerable.Empty<IMetadataObject>());
         }
 
         void Initialize()
@@ -147,9 +141,9 @@ namespace GitObjectDb.Compare
             var properties = _modelDataProvider.Get(type).ModifiableProperties;
 
             JToken headValue = null;
-            ModifiablePropertyInfo p = null;
             var changes = from kvp in (IEnumerable<KeyValuePair<string, JToken>>)newObject
-                          where properties.TryGetValue(kvp.Key, out p)
+                          let p = properties.FirstOrDefault(pr => pr.Name.Equals(kvp.Key, StringComparison.OrdinalIgnoreCase))
+                          where p != null
                           let mergeBaseValue = mergeBaseObject[kvp.Key]
                           where mergeBaseValue == null || !JToken.DeepEquals(kvp.Value, mergeBaseValue)
                           where headObject.TryGetValue(kvp.Key, StringComparison.OrdinalIgnoreCase, out headValue) || ((headValue = null) == null)
