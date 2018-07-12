@@ -54,11 +54,22 @@ namespace GitObjectDb.Tests.Git
                 fixture.Inject((Expression)Expression.Default(typeof(object)));
                 fixture.Register<AbstractInstance>(() => fixture.Create<Instance>());
                 fixture.Register<AbstractModel>(() => fixture.Create<Instance>());
-                fixture.Inject<Func<IRepository, Tree>>(r => r.Head.Tip.Tree);
                 fixture.Inject<ConstructorParameterBinding.ChildProcessor>((name, children, @new, dataAccessor) => children);
                 fixture.Inject<ConstructorParameterBinding.Clone>((@object, predicateReflector, processor) => @object);
+                CustomizeGitObjects(fixture);
+                CustomizeJsonObjects(fixture);
+            }
+
+            static void CustomizeGitObjects(IFixture fixture)
+            {
+                fixture.Inject<Func<IRepository, Tree>>(r => r.Head.Tip.Tree);
                 fixture.Inject(new ObjectId("2fa2540fecec8c4908fb0ccba825cdb903f09440"));
                 fixture.Inject(Substitute.For<PatchEntryChanges>());
+                fixture.Inject(Substitute.For<TreeEntryChanges>());
+            }
+
+            static void CustomizeJsonObjects(IFixture fixture)
+            {
                 fixture.Inject(JObject.Parse(@"{""a"": ""b""}"));
                 fixture.Register<JToken>(() => fixture.Create<JObject>());
             }

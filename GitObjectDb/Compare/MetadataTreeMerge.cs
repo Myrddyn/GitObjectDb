@@ -111,23 +111,27 @@ namespace GitObjectDb.Compare
 
         void ComputeMerge(IRepository repository, Commit mergeBase, Commit branchTip, Commit headTip)
         {
-            var branchChanges = repository.Diff.Compare<Patch>(mergeBase.Tree, branchTip.Tree);
-            var headChanges = repository.Diff.Compare<Patch>(mergeBase.Tree, headTip.Tree);
-            foreach (var change in branchChanges)
+            using (var branchChanges = repository.Diff.Compare<Patch>(mergeBase.Tree, branchTip.Tree))
             {
-                switch (change.Status)
+                using (var headChanges = repository.Diff.Compare<Patch>(mergeBase.Tree, headTip.Tree))
                 {
-                    case ChangeKind.Modified:
-                        var mergeBaseObject = GetContent(mergeBase, change.Path, "merge base");
-                        var branchObject = GetContent(branchTip, change.Path, "branch tip");
-                        var headObject = GetContent(headTip, change.Path, "head tip");
+                    foreach (var change in branchChanges)
+                    {
+                        switch (change.Status)
+                        {
+                            case ChangeKind.Modified:
+                                var mergeBaseObject = GetContent(mergeBase, change.Path, "merge base");
+                                var branchObject = GetContent(branchTip, change.Path, "branch tip");
+                                var headObject = GetContent(headTip, change.Path, "head tip");
 
-                        AddModifiedChunks(change, mergeBaseObject, branchObject, headObject, headChanges);
-                        break;
-                    case ChangeKind.Added:
-                    case ChangeKind.Deleted:
-                    default:
-                        throw new NotImplementedException("Deletion for branch merge is not supported.");
+                                AddModifiedChunks(change, mergeBaseObject, branchObject, headObject, headChanges);
+                                break;
+                            case ChangeKind.Added:
+                            case ChangeKind.Deleted:
+                            default:
+                                throw new NotImplementedException("Deletion for branch merge is not supported.");
+                        }
+                    }
                 }
             }
         }
