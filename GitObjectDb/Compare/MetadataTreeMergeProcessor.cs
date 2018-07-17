@@ -1,5 +1,6 @@
 using GitObjectDb.Attributes;
 using GitObjectDb.Git;
+using GitObjectDb.Git.Hooks;
 using GitObjectDb.Migrations;
 using GitObjectDb.Models;
 using GitObjectDb.Reflection;
@@ -22,6 +23,7 @@ namespace GitObjectDb.Compare
         readonly IRepositoryProvider _repositoryProvider;
         readonly RepositoryDescription _repositoryDescription;
         readonly Lazy<JsonSerializer> _serializer;
+        readonly GitHooks _hooks;
 
         readonly MetadataTreeMerge _metadataTreeMerge;
         readonly StringBuilder _buffer = new StringBuilder();
@@ -48,6 +50,7 @@ namespace GitObjectDb.Compare
 
             _repositoryProvider = serviceProvider.GetRequiredService<IRepositoryProvider>();
             _serializer = new Lazy<JsonSerializer>(() => serviceProvider.GetRequiredService<IInstanceLoader>().GetJsonSerializer());
+            _hooks = serviceProvider.GetRequiredService<GitHooks>();
         }
 
         static JObject GetContent(Commit mergeBase, string path, string branchInfo)
@@ -88,8 +91,8 @@ namespace GitObjectDb.Compare
             var branch = repository.Branches[_metadataTreeMerge.BranchName];
             var treeDefinition = CreateTree(repository);
             var message = $"Merge branch {branch.FriendlyName} into {repository.Head.FriendlyName}";
-            var commit = repository.Commit(treeDefinition, message, merger, merger, mergeParent: repository.Lookup<Commit>(_metadataTreeMerge.BranchTarget));
-            return commit.Id;
+            var commit = repository.Commit(_hooks, treeDefinition, message, merger, merger, mergeParent: repository.Lookup<Commit>(_metadataTreeMerge.BranchTarget));
+            return commit?.Id;
         }
 
         TreeDefinition CreateTree(IRepository repository)

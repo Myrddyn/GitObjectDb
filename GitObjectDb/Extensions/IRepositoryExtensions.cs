@@ -1,4 +1,5 @@
 using GitObjectDb.Git;
+using GitObjectDb.Git.Hooks;
 using GitObjectDb.IO;
 using LibGit2Sharp;
 using System;
@@ -47,23 +48,25 @@ namespace LibGit2Sharp
         /// Inserts a <see cref="LibGit2Sharp.Commit" /> into the object database by applying actions to a <see cref="TreeDefinition"/>.
         /// </summary>
         /// <param name="repository">The repository.</param>
+        /// <param name="hooks">The hooks.</param>
         /// <param name="actions">The actions to be applied to the <see cref="TreeDefinition"/>.</param>
         /// <param name="message">The message of the commit.</param>
         /// <param name="author">The author.</param>
         /// <param name="committer">The committer.</param>
         /// <param name="options">The options.</param>
         /// <returns>The created <see cref="LibGit2Sharp.Commit" />.</returns>
-        internal static Commit Commit(this IRepository repository, Action<IRepository, TreeDefinition> actions, string message, Signature author, Signature committer, CommitOptions options = null)
+        internal static Commit Commit(this IRepository repository, GitHooks hooks, Action<IRepository, TreeDefinition> actions, string message, Signature author, Signature committer, CommitOptions options = null)
         {
             var treeDefinition = !repository.Info.IsHeadUnborn ? TreeDefinition.From(repository.Head.Tip.Tree) : new TreeDefinition();
             actions(repository, treeDefinition);
-            return Commit(repository, treeDefinition, message, author, committer, options);
+            return repository.Commit(hooks, treeDefinition, message, author, committer, options);
         }
 
         /// <summary>
         /// Inserts a <see cref="LibGit2Sharp.Commit" /> into the object database by applying a <see cref="TreeDefinition"/>.
         /// </summary>
         /// <param name="repository">The repository.</param>
+        /// <param name="hooks">The hooks.</param>
         /// <param name="treeDefinition">The tree definition.</param>
         /// <param name="message">The message.</param>
         /// <param name="author">The author.</param>
@@ -71,11 +74,15 @@ namespace LibGit2Sharp
         /// <param name="options">The options.</param>
         /// <param name="mergeParent">The parent commit for a merge.</param>
         /// <returns>The created <see cref="LibGit2Sharp.Commit" />.</returns>
-        internal static Commit Commit(this IRepository repository, TreeDefinition treeDefinition, string message, Signature author, Signature committer, CommitOptions options = null, Commit mergeParent = null)
+        internal static Commit Commit(this IRepository repository, GitHooks hooks, TreeDefinition treeDefinition, string message, Signature author, Signature committer, CommitOptions options = null, Commit mergeParent = null)
         {
             if (options == null)
             {
                 options = new CommitOptions();
+            }
+            if (!hooks.OnCommitStarted(message))
+            {
+                return null;
             }
 
             var parents = RetrieveParentsOfTheCommitBeingCreated(repository, options.AmendPreviousCommit, mergeParent).ToList();

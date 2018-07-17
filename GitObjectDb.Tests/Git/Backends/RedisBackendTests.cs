@@ -1,4 +1,5 @@
 using AutoFixture.NUnit3;
+using GitObjectDb.Git.Hooks;
 using LibGit2Sharp;
 using NUnit.Framework;
 using StackExchange.Redis;
@@ -18,7 +19,7 @@ namespace GitObjectDb.Tests.Git.Backends
 
         [Test]
         [AutoData]
-        public void RedisBackend(Signature signature, string message)
+        public void RedisBackend(Signature signature, string message, GitHooks hooks)
         {
             var path = GetTempPath();
             Repository.Init(path, true);
@@ -28,6 +29,7 @@ namespace GitObjectDb.Tests.Git.Backends
                 repository.ObjectDatabase.AddBackend(sut, priority: 5);
 
                 repository.Commit(
+                    hooks,
                     (r, d) => d.Add("somefile.txt", r.CreateBlob(new StringBuilder("foo")), Mode.NonExecutableFile),
                     message, signature, signature);
             }

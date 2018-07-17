@@ -1,4 +1,5 @@
 using GitObjectDb.Git;
+using GitObjectDb.Git.Hooks;
 using GitObjectDb.Reflection;
 using LibGit2Sharp;
 using System;
@@ -23,6 +24,7 @@ namespace GitObjectDb.Models
         internal RepositoryDescription _repositoryDescription;
 
         readonly IInstanceLoader _instanceLoader;
+        readonly GitHooks _hooks;
 
         /// <inheritdoc />
         public ObjectId CommitId { get; private set; }
@@ -58,7 +60,7 @@ namespace GitObjectDb.Models
 
             return _repositoryProvider.Execute(repositoryDescription, repository =>
             {
-                var result = repository.Commit(AddMetadataObjectToCommit, message, signature, signature);
+                var result = repository.Commit(_hooks, AddMetadataObjectToCommit, message, signature, signature);
                 SetRepositoryData(repositoryDescription, result.Id);
                 return result;
             });

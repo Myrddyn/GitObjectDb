@@ -35,7 +35,7 @@ namespace GitObjectDb.Models
                 var computeChanges = _computeTreeChangesFactory(_repositoryDescription);
                 var changes = computeChanges.Compare(this, newInstance);
                 return changes.AnyChange ?
-                    repository.Commit(changes.NewTree, message, signature, signature, options) :
+                    repository.Commit(_hooks, changes.NewTree, message, signature, signature, options) :
                     null;
             });
         }

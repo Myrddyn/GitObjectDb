@@ -1,6 +1,7 @@
 using GitObjectDb.Attributes;
 using GitObjectDb.Compare;
 using GitObjectDb.Git;
+using GitObjectDb.Git.Hooks;
 using GitObjectDb.Migrations;
 using LibGit2Sharp;
 using Newtonsoft.Json;
@@ -52,6 +53,7 @@ namespace GitObjectDb.Models
             _metadataTreeMergeFactory = serviceProvider.GetRequiredService<Func<RepositoryDescription, ObjectId, string, IMetadataTreeMerge>>();
             _repositoryProvider = serviceProvider.GetRequiredService<IRepositoryProvider>();
             _instanceLoader = serviceProvider.GetRequiredService<IInstanceLoader>();
+            _hooks = serviceProvider.GetRequiredService<GitHooks>();
             Migrations = (migrations ?? throw new ArgumentNullException(nameof(migrations))).AttachToParent(this);
         }
 
