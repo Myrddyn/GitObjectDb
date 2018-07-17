@@ -1,3 +1,4 @@
+using GitObjectDb.Attributes;
 using GitObjectDb.Models;
 using System;
 using System.Collections.Generic;
@@ -25,6 +26,7 @@ namespace GitObjectDb.Compare
 #pragma warning restore CA1000 // Do not declare static members on generic types
 
         /// <inheritdoc/>
+        [ExcludeFromGuardForNull]
         public bool Equals(TModel x, TModel y)
         {
             return x == y ||
@@ -32,6 +34,7 @@ namespace GitObjectDb.Compare
         }
 
         /// <inheritdoc/>
+        [ExcludeFromGuardForNull]
         public int GetHashCode(TModel obj)
         {
             return obj?.Id.GetHashCode() ?? 0;

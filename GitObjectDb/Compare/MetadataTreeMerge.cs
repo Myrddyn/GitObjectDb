@@ -1,7 +1,6 @@
-using DiffPatch;
-using DiffPatch.Data;
 using GitObjectDb.Attributes;
 using GitObjectDb.Git;
+using GitObjectDb.Migrations;
 using GitObjectDb.Models;
 using GitObjectDb.Reflection;
 using LibGit2Sharp;
@@ -19,13 +18,11 @@ namespace GitObjectDb.Compare
     [ExcludeFromGuardForNull]
     public sealed class MetadataTreeMerge : IMetadataTreeMerge
     {
+        readonly IServiceProvider _serviceProvider;
         readonly IRepositoryProvider _repositoryProvider;
         readonly IModelDataAccessorProvider _modelDataProvider;
-        readonly IInstanceLoader _instanceLoader;
+        readonly Func<RepositoryDescription, MigrationScaffolder> _migrationScaffolderFactory;
         readonly RepositoryDescription _repositoryDescription;
-        readonly Lazy<JsonSerializer> _serializer;
-
-        ObjectId _branchTip;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="MetadataTreeMerge"/> class.
@@ -47,18 +44,14 @@ namespace GitObjectDb.Compare
         /// </exception>
         public MetadataTreeMerge(IServiceProvider serviceProvider, RepositoryDescription repositoryDescription, ObjectId commitId, string branchName)
         {
-            if (serviceProvider == null)
-            {
-                throw new ArgumentNullException(nameof(serviceProvider));
-            }
+            _serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
             _repositoryDescription = repositoryDescription ?? throw new ArgumentNullException(nameof(repositoryDescription));
             CommitId = commitId ?? throw new ArgumentNullException(nameof(commitId));
             BranchName = branchName ?? throw new ArgumentNullException(nameof(branchName));
 
             _repositoryProvider = serviceProvider.GetRequiredService<IRepositoryProvider>();
             _modelDataProvider = serviceProvider.GetRequiredService<IModelDataAccessorProvider>();
-            _instanceLoader = serviceProvider.GetRequiredService<IInstanceLoader>();
-            _serializer = new Lazy<JsonSerializer>(() => _instanceLoader.GetJsonSerializer());
+            _migrationScaffolderFactory = serviceProvider.GetRequiredService<Func<RepositoryDescription, MigrationScaffolder>>();
 
             Initialize();
         }
@@ -70,7 +63,22 @@ namespace GitObjectDb.Compare
         public string BranchName { get; }
 
         /// <inheritdoc/>
+        public ObjectId BranchTarget { get; private set; }
+
+        /// <inheritdoc/>
+        public bool IsPartialMerge { get; private set; }
+
+        /// <inheritdoc/>
+        public Migrator RequiredMigrator { get; private set; }
+
+        /// <inheritdoc/>
         public IList<MetadataTreeMergeChunkChange> ModifiedChunks { get; } = new List<MetadataTreeMergeChunkChange>();
+
+        /// <inheritdoc/>
+        public IList<MetadataTreeMergeObjectAdd> AddedObjects { get; } = new List<MetadataTreeMergeObjectAdd>();
+
+        /// <inheritdoc/>
+        public IList<MetadataTreeMergeObjectDelete> DeletedObjects { get; } = new List<MetadataTreeMergeObjectDelete>();
 
         static JObject GetContent(Commit mergeBase, string path, string branchInfo)
         {
@@ -87,15 +95,39 @@ namespace GitObjectDb.Compare
 
                 var branch = repository.Branches[BranchName];
                 var branchTip = branch.Tip;
-                _branchTip = branchTip.Id;
+                BranchTarget = branchTip.Id;
                 var headTip = repository.Head.Tip;
                 var baseCommit = repository.ObjectDatabase.FindMergeBase(headTip, branchTip);
+
+                var migrationScaffolder = _migrationScaffolderFactory(_repositoryDescription);
+                var migrators = migrationScaffolder.Scaffold(baseCommit.Id, BranchTarget, MigrationMode.Upgrade);
+
+                branchTip = ResolveRequiredMigrator(repository, branchTip, migrators);
 
                 ComputeMerge(repository, baseCommit, branchTip, headTip);
             });
         }
 
-        void EnsureHeadCommit(IRepository repository)
+        Commit ResolveRequiredMigrator(IRepository repository, Commit branchTip, System.Collections.Immutable.IImmutableList<Migrator> migrators)
+        {
+            RequiredMigrator = migrators.Count > 0 ? migrators[0] : null;
+            if (RequiredMigrator != null && RequiredMigrator.CommitId != BranchTarget)
+            {
+                IsPartialMerge = true;
+
+                branchTip = repository.Lookup<Commit>(RequiredMigrator.CommitId);
+                BranchTarget = RequiredMigrator.CommitId;
+            }
+
+            return branchTip;
+        }
+
+        /// <summary>
+        /// Ensures that the head tip refers to the right commit.
+        /// </summary>
+        /// <param name="repository">The repository.</param>
+        /// <exception cref="NotSupportedException">The current head commit id is different from the commit used by current instance.</exception>
+        internal void EnsureHeadCommit(IRepository repository)
         {
             if (!repository.Head.Tip.Id.Equals(CommitId))
             {
@@ -114,25 +146,59 @@ namespace GitObjectDb.Compare
                         switch (change.Status)
                         {
                             case ChangeKind.Modified:
-                                var mergeBaseObject = GetContent(mergeBase, change.Path, "merge base");
-                                var branchObject = GetContent(branchTip, change.Path, "branch tip");
-                                var headObject = GetContent(headTip, change.Path, "head tip");
-
-                                AddModifiedChunks(change, mergeBaseObject, branchObject, headObject, headChanges);
+                                ComputeMerge_Modified(mergeBase, branchTip, headTip, headChanges, change);
                                 break;
                             case ChangeKind.Added:
+                                ComputeMerge_Added(branchTip, change, headChanges);
+                                break;
                             case ChangeKind.Deleted:
+                                ComputeMerge_Deleted(mergeBase, change, headChanges);
+                                break;
                             default:
-                                throw new NotImplementedException("Deletion for branch merge is not supported.");
+                                throw new NotImplementedException($"Change type '{change.Status}' for branch merge is not supported.");
                         }
                     }
                 }
             }
         }
 
-        void AddModifiedChunks(PatchEntryChanges branchChange, JObject mergeBaseObject, JObject newObject, JObject headObject, Patch headChanges)
+        void ComputeMerge_Modified(Commit mergeBase, Commit branchTip, Commit headTip, Patch headChanges, PatchEntryChanges change)
         {
-            var headChange = headChanges[branchChange.Path];
+            var mergeBaseObject = GetContent(mergeBase, change.Path, "merge base");
+            var branchObject = GetContent(branchTip, change.Path, "branch tip");
+            var headObject = GetContent(headTip, change.Path, "head tip");
+
+            AddModifiedChunks(change, mergeBaseObject, branchObject, headObject, headChanges[change.Path]);
+        }
+
+        void ComputeMerge_Added(Commit branchTip, PatchEntryChanges change, Patch headChanges)
+        {
+            var parentDataPath = change.Path.GetDataParentDataPath();
+            if (headChanges.Any(c => c.Path.Equals(parentDataPath, StringComparison.OrdinalIgnoreCase) && c.Status == ChangeKind.Deleted))
+            {
+                throw new NotImplementedException("Node addition while parent has been deleted in head is not supported.");
+            }
+
+            var branchObject = GetContent(branchTip, change.Path, "branch tip");
+            AddedObjects.Add(new MetadataTreeMergeObjectAdd(change.Path, branchObject));
+        }
+
+        void ComputeMerge_Deleted(Commit mergeBase, PatchEntryChanges change, Patch headChanges)
+        {
+            var folder = change.Path.Replace($"/{FileSystemStorage.DataFile}", string.Empty);
+            if (headChanges.Any(c => c.Path.Equals(folder, StringComparison.OrdinalIgnoreCase) && (c.Status == ChangeKind.Added || c.Status == ChangeKind.Modified)))
+            {
+                throw new NotImplementedException("Node deletion while children have been added or modified in head is not supported.");
+            }
+
+            var mergeBaseObject = GetContent(mergeBase, change.Path, "branch tip");
+            DeletedObjects.Add(new MetadataTreeMergeObjectDelete(change.Path, mergeBaseObject));
+        }
+
+        bool ExcludeSpecialFolder(PatchEntryChanges entry) => entry.Path[0] != FileSystemStorage.Prefix;
+
+        void AddModifiedChunks(PatchEntryChanges branchChange, JObject mergeBaseObject, JObject newObject, JObject headObject, PatchEntryChanges headChange)
+        {
             if (headChange?.Status == ChangeKind.Deleted)
             {
                 throw new NotImplementedException($"Conflict as a modified node {branchChange.Path} in merge branch source has been deleted in head.");
@@ -156,57 +222,6 @@ namespace GitObjectDb.Compare
         }
 
         /// <inheritdoc/>
-        public Commit Apply(Signature merger)
-        {
-            if (merger == null)
-            {
-                throw new ArgumentNullException(nameof(merger));
-            }
-            var remainingConflicts = ModifiedChunks.Where(c => c.IsInConflict).ToList();
-            if (remainingConflicts.Any())
-            {
-                throw new RemainingConflictsException(remainingConflicts);
-            }
-
-            return _repositoryProvider.Execute(_repositoryDescription, repository =>
-            {
-                EnsureHeadCommit(repository);
-                var branch = repository.Branches[BranchName];
-                var branchTip = branch.Tip;
-                if (branchTip.Id != _branchTip)
-                {
-                    throw new NotImplementedException($"The branch {branch.FriendlyName} has changed since merge started.");
-                }
-                var treeDefinition = CreateTree(repository);
-                var message = $"Merge branch {branch.FriendlyName} into {repository.Head.FriendlyName}";
-                return repository.Commit(treeDefinition, message, merger, merger, mergeParent: branchTip);
-            });
-        }
-
-        TreeDefinition CreateTree(IRepository repository)
-        {
-            var definition = TreeDefinition.From(repository.Head.Tip);
-            var buffer = new StringBuilder();
-            foreach (var change in ModifiedChunks.GroupBy(c => c.HeadNode))
-            {
-                var modified = (JObject)change.Key.DeepClone();
-                foreach (var chunkChange in change)
-                {
-                    chunkChange.ApplyTo(modified);
-                }
-                Serialize(modified, buffer);
-                definition.Add(change.First().Path, repository.CreateBlob(buffer), Mode.NonExecutableFile);
-            }
-            return definition;
-        }
-
-        void Serialize(JToken modified, StringBuilder buffer)
-        {
-            buffer.Clear();
-            using (var writer = new StringWriter(buffer))
-            {
-                _serializer.Value.Serialize(writer, modified);
-            }
-        }
+        public ObjectId Apply(Signature merger) => new MetadataTreeMergeProcessor(_serviceProvider, _repositoryDescription, this).Apply(merger);
     }
 }

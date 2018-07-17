@@ -94,7 +94,7 @@ namespace GitObjectDb.Compare
             (from c in changes.Where(c => c.Status == ChangeKind.Modified)
              let oldEntry = oldCommit[c.Path]
              where oldEntry.TargetType == TreeEntryTargetType.Blob
-             let path = c.Path.ParentPath()
+             let path = c.Path.GetParentPath()
              let oldNode = oldInstance.TryGetFromGitPath(path) ?? throw new NotSupportedException($"Node {path} could not be found in old instance.")
              let newNode = newInstance.TryGetFromGitPath(path) ?? throw new NotSupportedException($"Node {path} could not be found in new instance.")
              select new MetadataTreeEntryChanges(c, oldNode, newNode))
@@ -104,7 +104,7 @@ namespace GitObjectDb.Compare
             (from c in changes.Where(c => c.Status == ChangeKind.Added)
              let newEntry = newCommit[c.Path]
              where newEntry.TargetType == TreeEntryTargetType.Blob
-             let path = c.Path.ParentPath()
+             let path = c.Path.GetParentPath()
              let newNode = newInstance.TryGetFromGitPath(path) ?? throw new NotSupportedException($"Node {path} could not be found in new instance.")
              select new MetadataTreeEntryChanges(c, null, newNode))
             .ToImmutableList();
@@ -113,7 +113,7 @@ namespace GitObjectDb.Compare
             (from c in changes.Where(c => c.Status == ChangeKind.Deleted)
              let oldEntry = oldCommit[c.Path]
              where oldEntry.TargetType == TreeEntryTargetType.Blob
-             let path = c.Path.ParentPath()
+             let path = c.Path.GetParentPath()
              let oldNode = oldInstance.TryGetFromGitPath(path) ?? throw new NotSupportedException($"Node {path} could not be found in old instance.")
              select new MetadataTreeEntryChanges(c, oldNode, null))
             .ToImmutableList();
@@ -174,7 +174,7 @@ namespace GitObjectDb.Compare
                     continue;
                 }
 
-                stack.Push(childProperty.Name);
+                stack.Push(childProperty.FolderName);
                 anyChange |= CompareNodeChildren(repository, original, @new, tree, definition, stack, childProperty);
                 stack.Pop();
             }

@@ -1,4 +1,5 @@
 using GitObjectDb.Compare;
+using GitObjectDb.Git;
 using GitObjectDb.Models;
 using LibGit2Sharp;
 using Newtonsoft.Json;
@@ -17,19 +18,20 @@ namespace GitObjectDb.Migrations
     public class MigrationScaffolder
     {
         readonly JsonSerializer _serializer;
-        readonly IRepository _repository;
+        readonly IRepositoryProvider _repositoryProvider;
+        readonly RepositoryDescription _repositoryDescription;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="MigrationScaffolder"/> class.
         /// </summary>
         /// <param name="serviceProvider">The service provider.</param>
-        /// <param name="repository">The repository.</param>
+        /// <param name="repositoryDescription">The repository description.</param>
         /// <exception cref="ArgumentNullException">
         /// serviceProvider
         /// or
         /// repository
         /// </exception>
-        public MigrationScaffolder(IServiceProvider serviceProvider, IRepository repository)
+        public MigrationScaffolder(IServiceProvider serviceProvider, RepositoryDescription repositoryDescription)
         {
             if (serviceProvider == null)
             {
@@ -37,7 +39,8 @@ namespace GitObjectDb.Migrations
             }
 
             _serializer = serviceProvider.GetRequiredService<IInstanceLoader>().GetJsonSerializer();
-            _repository = repository ?? throw new ArgumentNullException(nameof(repository));
+            _repositoryProvider = serviceProvider.GetRequiredService<IRepositoryProvider>();
+            _repositoryDescription = repositoryDescription ?? throw new ArgumentNullException(nameof(repositoryDescription));
         }
 
         /// <summary>
@@ -49,52 +52,61 @@ namespace GitObjectDb.Migrations
         /// <returns>The <see cref="Migrator"/> used to apply migrations.</returns>
         public IImmutableList<Migrator> Scaffold(ObjectId start, ObjectId end, MigrationMode mode)
         {
-            var log = _repository.Commits.QueryBy(Migration.GitPath, new CommitFilter
+            return _repositoryProvider.Execute(_repositoryDescription, repository =>
             {
-                IncludeReachableFrom = start
+                var log = repository.Commits.QueryBy(new CommitFilter
+                {
+                    SortBy = CommitSortStrategies.Topological | CommitSortStrategies.Reverse,
+                    ExcludeReachableFrom = start,
+                    IncludeReachableFrom = end
+                });
+                var deferred = new List<IMigration>();
+                var result = ImmutableList.CreateBuilder<Migrator>();
+                result.AddRange(GetLogMigrators(repository, log, deferred, repository.Lookup<Commit>(start), mode));
+                if (deferred.Any())
+                {
+                    var uniqueDeferredMigrations = deferred.Distinct(MetadataObjectIdComparer<IMigration>.Instance);
+                    if (result.Any())
+                    {
+                        var toUpdate = result[result.Count - 1];
+                        var newValue = new Migrator(toUpdate.Migrations.Concat(deferred).ToImmutableList(), mode, toUpdate.CommitId);
+                        result[result.Count - 1] = newValue;
+                    }
+                    else
+                    {
+                        result.Add(new Migrator(uniqueDeferredMigrations.ToImmutableList(), mode, end));
+                    }
+                }
+                return result.ToImmutable();
             });
-            var deferred = new List<IMigration>();
-            var result = ImmutableList.CreateBuilder<Migrator>();
-            result.AddRange(GetLogMigrators(log, deferred, end, mode));
-            if (deferred.Any())
-            {
-                var uniqueDeferredMigrations = deferred.Distinct(MetadataObjectIdComparer<IMigration>.Instance);
-                result.Add(new Migrator(uniqueDeferredMigrations.ToImmutableList(), mode));
-            }
-            return result.ToImmutable();
         }
 
-        IEnumerable<Migrator> GetLogMigrators(IEnumerable<LogEntry> log, List<IMigration> deferred, ObjectId end, MigrationMode mode)
+        IEnumerable<Migrator> GetLogMigrators(IRepository repository, ICommitLog log, List<IMigration> deferred, Commit previousCommit, MigrationMode mode)
         {
-            Commit previousCommit = default;
-            foreach (var entry in log)
+            foreach (var logCommit in log)
             {
-                var commit = entry.Commit;
+                var commit = logCommit.Peel<Commit>();
                 if (previousCommit != null)
                 {
-                    var migrations = GetCommitMigrations(previousCommit, commit).ToList();
+                    var migrations = GetCommitMigrations(repository, previousCommit, commit).ToList();
 
                     deferred.AddRange(migrations.Where(m => m.IsIdempotent));
 
-                    migrations.RemoveAll(m => !m.IsIdempotent);
-                    if (migrations.Any(m => !m.IsIdempotent))
+                    migrations.RemoveAll(m => m.IsIdempotent);
+                    if (migrations.Any())
                     {
                         yield return new Migrator(migrations.Where(m => !m.IsIdempotent).ToImmutableList(), mode, commit.Id);
                     }
-                }
-                if (commit.Id == end)
-                {
-                    break;
                 }
                 previousCommit = commit;
             }
         }
 
-        IEnumerable<IMigration> GetCommitMigrations(Commit previousCommit, Commit commit)
+        IEnumerable<IMigration> GetCommitMigrations(IRepository repository, Commit previousCommit, Commit commit)
         {
-            using (var changes = _repository.Diff.Compare<TreeChanges>(previousCommit.Tree, commit.Tree, new[] { AbstractInstance.MigrationFolder }))
+            using (var changes = repository.Diff.Compare<TreeChanges>(previousCommit.Tree, commit.Tree))
             {
-                foreach (var change in changes.Where(c => c.Status == ChangeKind.Added || c.Status == ChangeKind.Modified))
+                foreach (var change in changes.Where(c => c.Path.StartsWith(AbstractInstance.MigrationFolder, StringComparison.OrdinalIgnoreCase) && (c.Status == ChangeKind.Added || c.Status == ChangeKind.Modified)))
                 {
                     var blob = commit[change.Path].Target.Peel<Blob>();
                     var jobject = blob.GetContentStream().ToJson<JObject>(_serializer);

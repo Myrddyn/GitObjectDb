@@ -10,6 +10,7 @@ namespace GitObjectDb.Attributes
     /// </summary>
     /// <seealso cref="Attribute" />
     [AttributeUsage(AttributeTargets.Property)]
+    [ExcludeFromGuardForNull]
     public sealed class PropertyNameAttribute : Attribute
     {
         /// <summary>

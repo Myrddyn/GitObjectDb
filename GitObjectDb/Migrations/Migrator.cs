@@ -20,11 +20,11 @@ namespace GitObjectDb.Migrations
         /// <param name="mode">The mode.</param>
         /// <param name="commitId">The commit identifier containing the migrations.</param>
         /// <exception cref="ArgumentNullException">migrations</exception>
-        public Migrator(IImmutableList<IMigration> migrations, MigrationMode mode, ObjectId commitId = null)
+        public Migrator(IImmutableList<IMigration> migrations, MigrationMode mode, ObjectId commitId)
         {
             Migrations = migrations ?? throw new ArgumentNullException(nameof(migrations));
             Mode = mode;
-            CommitId = commitId;
+            CommitId = commitId ?? throw new ArgumentNullException(nameof(commitId));
         }
 
         /// <summary>
@@ -56,10 +56,20 @@ namespace GitObjectDb.Migrations
             }
             else
             {
+                ThrowIfAnyDowngradeNotSupported();
+
                 foreach (var migration in Migrations.Reverse())
                 {
                     migration.Down();
                 }
+            }
+        }
+
+        void ThrowIfAnyDowngradeNotSupported()
+        {
+            if (Migrations.Any(m => !m.CanDowngrade))
+            {
+                throw new NotSupportedException("One or more migrations do not support downgrading.");
             }
         }
     }

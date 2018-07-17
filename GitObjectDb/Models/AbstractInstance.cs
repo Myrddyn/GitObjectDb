@@ -27,7 +27,7 @@ namespace GitObjectDb.Models
         /// <summary>
         /// The migration folder.
         /// </summary>
-        internal const string MigrationFolder = "_Migrations";
+        internal const string MigrationFolder = "$Migrations";
 
         readonly Func<RepositoryDescription, IComputeTreeChanges> _computeTreeChangesFactory;
         readonly Func<RepositoryDescription, ObjectId, string, IMetadataTreeMerge> _metadataTreeMergeFactory;

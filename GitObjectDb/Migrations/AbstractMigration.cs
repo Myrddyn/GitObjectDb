@@ -9,20 +9,15 @@ namespace GitObjectDb.Migrations
     /// <summary>
     /// Represents the base class for migrations.
     /// </summary>
-    public abstract class Migration : AbstractModel, IMigration
+    public abstract class AbstractMigration : AbstractModel, IMigration
     {
         /// <summary>
-        /// The git path containing migrations.
-        /// </summary>
-        internal const string GitPath = "Repository";
-
-        /// <summary>
-        /// Initializes a new instance of the <see cref="Migration"/> class.
+        /// Initializes a new instance of the <see cref="AbstractMigration"/> class.
         /// </summary>
         /// <param name="serviceProvider">The service provider.</param>
         /// <param name="id">The identifier.</param>
         /// <param name="name">The name.</param>
-        protected Migration(IServiceProvider serviceProvider, Guid id, string name)
+        protected AbstractMigration(IServiceProvider serviceProvider, Guid id, string name)
             : base(serviceProvider, id, name)
         {
         }

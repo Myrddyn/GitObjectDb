@@ -15,11 +15,6 @@ namespace GitObjectDb.Models
     /// <inheritdoc />
     internal class InstanceLoader : IInstanceLoader
     {
-        /// <summary>
-        /// The data file name used to store information in Git.
-        /// </summary>
-        internal const string DataFile = "data.json";
-
         readonly IContractResolver _contractResolver = new DefaultContractResolver();
         readonly IServiceProvider _serviceProvider;
         readonly IModelDataAccessorProvider _dataAccessorProvider;
@@ -58,7 +53,7 @@ namespace GitObjectDb.Models
                     currentCommit = repository.Lookup<Commit>(commitId);
                 }
 
-                var instance = (AbstractInstance)LoadEntry(commitId, currentCommit[DataFile], string.Empty);
+                var instance = (AbstractInstance)LoadEntry(commitId, currentCommit[FileSystemStorage.DataFile], string.Empty);
                 instance.SetRepositoryData(repositoryDescription, commitId);
                 return instance;
             });
@@ -131,7 +126,7 @@ namespace GitObjectDb.Models
                     from c in subTree
                     where c.TargetType == TreeEntryTargetType.Tree
                     let childTree = c.Target.Peel<Tree>()
-                    let data = childTree[DataFile]
+                    let data = childTree[FileSystemStorage.DataFile]
                     where data != null
                     select LoadEntry(commitId, data, $"{childPath}/{c.Name}") :
 
