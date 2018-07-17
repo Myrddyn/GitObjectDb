@@ -87,6 +87,13 @@ namespace GitObjectDb.Compare
             return JsonConvert.DeserializeObject<JObject>(content);
         }
 
+        static JToken TryGetToken(JObject headObject, KeyValuePair<string, JToken> kvp)
+        {
+            return headObject.TryGetValue(kvp.Key, StringComparison.OrdinalIgnoreCase, out var headValue) ?
+                headValue :
+                null;
+        }
+
         void Initialize()
         {
             _repositoryProvider.Execute(_repositoryDescription, repository =>
@@ -195,8 +202,6 @@ namespace GitObjectDb.Compare
             DeletedObjects.Add(new MetadataTreeMergeObjectDelete(change.Path, mergeBaseObject));
         }
 
-        bool ExcludeSpecialFolder(PatchEntryChanges entry) => entry.Path[0] != FileSystemStorage.Prefix;
-
         void AddModifiedChunks(PatchEntryChanges branchChange, JObject mergeBaseObject, JObject newObject, JObject headObject, PatchEntryChanges headChange)
         {
             if (headChange?.Status == ChangeKind.Deleted)
@@ -206,13 +211,12 @@ namespace GitObjectDb.Compare
             var type = Type.GetType(mergeBaseObject.Value<string>("$type"));
             var properties = _modelDataProvider.Get(type).ModifiableProperties;
 
-            JToken headValue = null;
             var changes = from kvp in (IEnumerable<KeyValuePair<string, JToken>>)newObject
                           let p = properties.FirstOrDefault(pr => pr.Name.Equals(kvp.Key, StringComparison.OrdinalIgnoreCase))
                           where p != null
                           let mergeBaseValue = mergeBaseObject[kvp.Key]
                           where mergeBaseValue == null || !JToken.DeepEquals(kvp.Value, mergeBaseValue)
-                          where headObject.TryGetValue(kvp.Key, StringComparison.OrdinalIgnoreCase, out headValue) || ((headValue = null) == null)
+                          let headValue = TryGetToken(headObject, kvp)
                           select new MetadataTreeMergeChunkChange(branchChange.Path, mergeBaseObject, newObject, headObject, p, mergeBaseValue, kvp.Value, headValue);
 
             foreach (var modifiedProperty in changes)

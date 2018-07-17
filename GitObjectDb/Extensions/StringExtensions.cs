@@ -1,6 +1,7 @@
 using GitObjectDb;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text;
 
 namespace System
@@ -24,17 +25,14 @@ namespace System
                 return string.Empty;
             }
 
-            var position = path.Length;
-            var remaining = count;
-            while (remaining-- > 0)
+            var parts = path.Split('/');
+
+            if (parts.Length < count)
             {
-                position = path.LastIndexOf('/', position - 1);
-                if (position == -1)
-                {
-                    throw new ArgumentException($"The parent path could not be found for '{path}'.", nameof(path));
-                }
+                throw new ArgumentException($"The parent path could not be found for '{path}'.", nameof(path));
             }
-            return path.Substring(0, position);
+
+            return string.Join("/", parts.Take(parts.Length - count));
         }
 
         /// <summary>
