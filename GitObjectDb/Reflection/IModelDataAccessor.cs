@@ -1,5 +1,6 @@
 using GitObjectDb.Models;
 using System;
+using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq.Expressions;
 
@@ -18,12 +19,12 @@ namespace GitObjectDb.Reflection
         /// <summary>
         /// Gets the child properties.
         /// </summary>
-        ImmutableList<ChildPropertyInfo> ChildProperties { get; }
+        IImmutableList<ChildPropertyInfo> ChildProperties { get; }
 
         /// <summary>
         /// Gets the modifiable properties.
         /// </summary>
-        ImmutableList<ModifiablePropertyInfo> ModifiableProperties { get; }
+        IImmutableList<ModifiablePropertyInfo> ModifiableProperties { get; }
 
         /// <summary>
         /// Gets the constructor parameter binding.
@@ -37,7 +38,17 @@ namespace GitObjectDb.Reflection
         /// <param name="source">The object.</param>
         /// <param name="predicate">The predicate.</param>
         /// <returns>The newly created copy. Both parents and children nodes have been cloned as well.</returns>
-        IMetadataObject With(IMetadataObject source, Expression predicate = null);
+        IMetadataObject With(IMetadataObject source, IPredicateReflector predicate);
 #pragma warning restore CA1716 // Identifiers should not match keywords
+
+        /// <summary>
+        /// Deep clones an instance and modify children on the fly.
+        /// </summary>
+        /// <param name="instance">The instance.</param>
+        /// <param name="processArgument">The process argument.</param>
+        /// <param name="childChangesGetter">The child changes getter.</param>
+        /// <param name="mustForceVisit">The must force visit.</param>
+        /// <returns>The cloned instance.</returns>
+        IObjectRepository DeepClone(IObjectRepository instance, ProcessArgument processArgument, ChildChangesGetter childChangesGetter, Func<IMetadataObject, bool> mustForceVisit);
     }
 }

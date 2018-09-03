@@ -2,6 +2,7 @@ using GitObjectDb.Attributes;
 using GitObjectDb.Models;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq.Expressions;
 using System.Reflection;
 
@@ -10,6 +11,7 @@ namespace GitObjectDb.Reflection
     /// <summary>
     /// Provides information to properties decorated with the <see cref="ModifiableAttribute"/> attribute.
     /// </summary>
+    [DebuggerDisplay("Name = {Name}")]
     public class ModifiablePropertyInfo
     {
         /// <summary>
@@ -32,6 +34,11 @@ namespace GitObjectDb.Reflection
         /// Gets the property value accessor.
         /// </summary>
         public Func<IMetadataObject, object> Accessor { get; }
+
+        /// <summary>
+        /// Gets the name of the property.
+        /// </summary>
+        public string Name => Property.Name;
 
         static Expression<Func<IMetadataObject, object>> CreateGetter(PropertyInfo property)
         {
@@ -70,21 +77,6 @@ namespace GitObjectDb.Reflection
             var oldValue = Accessor(old);
             var newValue = Accessor(@new);
             return oldValue == newValue || (oldValue?.Equals(newValue) ?? false);
-        }
-
-        /// <summary>
-        /// Gets whether this instance has the same case insensitive name.
-        /// </summary>
-        /// <param name="name">The name.</param>
-        /// <returns><code>true</code> is the names are matching.</returns>
-        public bool Matches(string name)
-        {
-            if (name == null)
-            {
-                throw new ArgumentNullException(nameof(name));
-            }
-
-            return Property.Name.Equals(name, StringComparison.OrdinalIgnoreCase);
         }
     }
 }

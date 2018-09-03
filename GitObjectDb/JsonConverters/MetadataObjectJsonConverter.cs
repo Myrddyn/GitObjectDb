@@ -31,24 +31,24 @@ namespace GitObjectDb.JsonConverters
             _childResolver = childResolver ?? throw new ArgumentNullException(nameof(childResolver));
         }
 
-        /// <summary>
-        /// Resolves children from the property name.
-        /// </summary>
-        /// <param name="parentType">Type of the parent.</param>
-        /// <param name="propertyName">Name of the property.</param>
-        /// <returns>An <see cref="ILazyChildren"/> instance containing the children.</returns>
-        internal delegate ILazyChildren ChildrenResolver(Type parentType, string propertyName);
-
         /// <inheritdoc />
         public override bool CanWrite => false;
 
         /// <inheritdoc />
         public override bool CanRead => true;
 
-        static object ResolveFromJsonToken(JsonProperty property, JObject jObject) =>
-            jObject.TryGetValue(property.PropertyName, StringComparison.OrdinalIgnoreCase, out var token) ?
-            token.ToObject(property.PropertyType) :
-            null;
+        static object ResolveFromJsonToken(JsonProperty property, JObject jObject)
+        {
+            if (jObject.TryGetValue(property.PropertyName, StringComparison.OrdinalIgnoreCase, out var token))
+            {
+                var typeName = (token as JContainer)?.Value<string>("$type");
+                var type = !string.IsNullOrEmpty(typeName) ?
+                    Type.GetType(typeName) :
+                    property.PropertyType;
+                return token.ToObject(type);
+            }
+            return null;
+        }
 
         /// <inheritdoc />
         public override bool CanConvert(Type objectType)
